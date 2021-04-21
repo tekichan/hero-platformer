@@ -1,39 +1,34 @@
 import Phaser from 'phaser';
-import logoImg from './assets/logo.png';
 
-class MyGame extends Phaser.Scene
-{
-    constructor ()
-    {
-        super();
-    }
+// import game logic from external files
+import HeroPlatformerScene from './HeroPlatformerScene'
 
-    preload ()
-    {
-        this.load.image('logo', logoImg);
-    }
-      
-    create ()
-    {
-        const logo = this.add.image(400, 150, 'logo');
-      
-        this.tweens.add({
-            targets: logo,
-            y: 450,
-            duration: 2000,
-            ease: "Power2",
-            yoyo: true,
-            loop: -1
-        });
-    }
-}
-
-const config = {
+/**
+ * Phaser Game Configuration
+ */
+const gameConfig = {
     type: Phaser.AUTO,
-    parent: 'phaser-example',
-    width: 800,
-    height: 600,
-    scene: MyGame
+    backgroundColor: '#000000',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
+        width: 375,
+        height: 667
+    },
+    pixelArt: true,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: {
+                y: 0
+            }
+        }
+    },
+    scene: [HeroPlatformerScene]
 };
 
-const game = new Phaser.Game(config);
+/**
+ * Create an object of Phaser.Game using gameConfig configuration.
+ * The object will build the game accordingly.
+ */
+const game = new Phaser.Game(gameConfig);
