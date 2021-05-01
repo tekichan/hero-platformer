@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 // Load game images
 import image_steve_stop from './assets/steve_stop.png';
 import image_grass_block from './assets/grass_block.png';
+import image_melody_stand from './assets/melody_stand.png';
 
 // Define constants which will be widely used
 let screen_velocity = 20;
@@ -31,6 +32,7 @@ export default class HeroPlatformerScene extends Phaser.Scene{
     preload() {
         this.load.image('hero', image_steve_stop);   // Load the hero image
         this.load.image('grass_block', image_grass_block);    // Load the grass block image 
+        this.load.image('melody', image_melody_stand);    // Load the melody image 
     }
 
     /**
@@ -52,10 +54,6 @@ export default class HeroPlatformerScene extends Phaser.Scene{
         let hero_start_y = this.game.config.height / 2;        
         let hero_name = 'hero';    // Each sprite should have a name
         this.hero = this.physics.add.sprite(hero_start_x, hero_start_y, hero_name);
-
-        // Adjust the sprite scale not too large or too small
-        let hero_display_scale = 0.3;
-        this.hero.setScale(hero_display_scale);
 
         // Set the sprite gravity effect (able to fall down)
         let steve_gravity = 400;
@@ -101,7 +99,7 @@ export default class HeroPlatformerScene extends Phaser.Scene{
                 key: 'grass_block'
                 , repeat: 6
                 , setXY: {
-                    x: 260
+                    x: 300
                     , y: this.game.config.height - 150
                     , stepX: 30
                 }
@@ -109,9 +107,8 @@ export default class HeroPlatformerScene extends Phaser.Scene{
         );
         
         // For each child block, scale down the size and fix it not moveable
-        this.grass_group.children.iterate(
+        this.grass_group.children.each(
             (child) => {
-                child.setScale(0.05, 0.05);
                 child.setImmovable(true);
             }
         );
@@ -121,6 +118,24 @@ export default class HeroPlatformerScene extends Phaser.Scene{
 
         // Make grass blocks and hero be bound to each other
         this.physics.add.collider(this.grass_group, this.hero);
+    }
+
+    /**
+     * Method: create an enemy #1: Melody
+     */
+     create_melody(pos_x, pos_y) {
+        // Set the character's start position (pos_x,pos_y) as the center of the screen
+        let melody_name = 'melody';    // Each sprite should have a name
+        this.melody = this.physics.add.sprite(pos_x, pos_y, melody_name);
+
+        // Set the sprite gravity effect (able to fall down)
+        let melody_gravity = 400;
+        this.melody.body.gravity.y = melody_gravity;
+
+        // Make grass blocks and melody be bound to each other
+        this.physics.add.collider(this.grass_group, this.melody);
+        
+        this.melody.setVelocityX(-1 * screen_velocity);
     }
 
     /**
@@ -145,61 +160,65 @@ export default class HeroPlatformerScene extends Phaser.Scene{
             this.hero.setVelocityX(screen_velocity);
         }
 
+        // Remove child grass if it is out of screen (left side)
+        this.grass_group.children.each(
+            (child) => {
+                if (child.body.x < 0) {
+                    this.grass_group.remove(child);
+                    // Add scores when new grass grounds are removed.
+                    this.updateScore(1);
+                }
+            }
+        );
+
         // If the right ground is moving to provide more space, fill it up
         if (this.getRightMostGrass().x < this.game.config.width - 90) {
+            /**
+             * Randomly create grass blocks in the front
+             * 0 - ground
+             * 1 - lower than the player
+             * 2 - as high as the player
+             * 3 - higher than the player
+             */
+            var random_make_grass = Math.floor(Math.random() * 4);
+            var target_y = 0;
+            switch(random_make_grass) {
+                case 1:
+                    target_y = this.getGridY(this.hero.body.y + 30);
+                    break;
+                case 2:
+                    target_y = this.getGridY(this.hero.body.y);
+                    break;
+                case 3:
+                    target_y = this.getGridY(this.hero.body.y - 30);
+                    break;
+                default:
+                    target_y = this.game.config.height - 30;
+                    break;
+            }
+            var num_of_blocks = Math.floor(Math.random() * 5) + 1;  
             // Create more grass platforms
             this.grass_group.createMultiple(
                 {
                     key: 'grass_block'
-                    , repeat: 3
+                    , repeat: num_of_blocks
                     , setXY: {
                         x: this.game.config.width
-                        , y: this.game.config.height - 30
+                        , y: target_y
                         , stepX: 30
                     }
                 } 
             );
             // For each child block, scale down the size and fix it not moveable
-            this.grass_group.children.iterate(
+            this.grass_group.children.each(
                 (child) => {
-                    child.setScale(0.05, 0.05);
                     child.setImmovable(true);
                     child.body.velocity.x = -1 * screen_velocity;
                 }
             );
-            // Add scores when new grass grounds are created.
-            this.updateScore(3);
+            // Create a melody on top of the right most grass
+            this.create_melody(this.game.config.width, target_y - 60);
         }
-
-        // Randomly create grass blocks in the front
-        /*
-        var random_number = Math.floor(Math.random() * 14);
-        if (random_number > 12) {
-            let target_x = 260;
-            let target_y = this.getGridY(this.hero.body.y);
-            // Only place a grass block if no overlapped item exists.
-            if (!this.hasAnySprite(target_x, target_y)) {
-                this.grass_group.createMultiple(
-                    {
-                        key: 'grass_block'
-                        , repeat: 3
-                        , setXY: {
-                            x: target_x
-                            , y: target_y
-                            , stepX: 30
-                        }
-                    } 
-                );
-                this.grass_group.children.iterate(
-                    (child) => {
-                        child.setScale(0.05, 0.05);
-                        child.setImmovable(true);
-                        child.body.velocity.x = -1 * screen_velocity;
-                    }
-                );
-            }
-        }
-        */
     }
     
     /**
@@ -237,27 +256,33 @@ export default class HeroPlatformerScene extends Phaser.Scene{
      */
     getGridY(coord_y) {
         var ground_y = this.game.config.height - 30;
-        var diff_from_ground = coord_y - ground_y;
+        var diff_from_ground = ground_y - coord_y;
         var count_of_grid = Math.floor(diff_from_ground / 30);
-        return count_of_grid * 30 + ground_y;
+        return ground_y - count_of_grid * 30;
     }
 
     /**
-     * Check whether the given coordinates is overlapped with any sprite
-     * @param {*} coord_x   Given X cooridnate
-     * @param {*} coord_y   Given Y coorindate
+     * Check whether the given rectangle is overlapped with any sprite
+     * @param {*} rect   Given rectangle
      * @returns     true if overlapped; else false
      */
-    hasAnySprite(coord_x, coord_y) {
+    hasAnySprite(rect) {
+        console.log(this.grass_group.children.size)
         // Check if overlapped with hero
-        if (this.hero.getBounds().contains(coord_x, coord_y)) {
+        if (Phaser.Geom.Rectangle.Overlaps(this.hero.getBounds(), rect)) {
             return true;
         }
+        console.log("hero: " + this.hero.body.x + ", " + this.hero.body.y);
+        console.log("rect: " + rect.left + ", " + rect.right + "|"+ rect.top + ", " + rect.bottom);
         // Check if overlapped with grass
         this.grass_group.children.iterate(
             (child) => {
-                if (child.getBounds().contains(coord_x, coord_y)) {
+                if (Phaser.Geom.Rectangle.Overlaps(child.getBounds(), rect)) {
                     return true;
+                } else {
+                    // console.log(child.getBounds().left + " vs " + rect.left + ", " + child.getBounds().right + " vs " + rect.right + "|"+ child.getBounds().top + " vs " + rect.top + ", " + child.getBounds().bottom + " vs " + rect.bottom);
+                    // console.log(rect.left + ", " + rect.right + "|"+ rect.top + ", " + rect.bottom);
+                    console.log(child.getBounds().left + ", " + child.getBounds().right + "|"+ child.getBounds().top + ", " + child.getBounds().bottom);
                 }
             }
         );
