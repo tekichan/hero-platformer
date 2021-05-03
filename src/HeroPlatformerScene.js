@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import image_steve_stop from './assets/steve_stop.png';
 import image_grass_block from './assets/grass_block.png';
 import image_melody_stand from './assets/melody_stand.png';
+import image_shuriken from './assets/shuriken.png';
 
 // Define constants which will be widely used
 let screen_velocity = 20;
@@ -33,6 +34,7 @@ export default class HeroPlatformerScene extends Phaser.Scene{
         this.load.image('hero', image_steve_stop);   // Load the hero image
         this.load.image('grass_block', image_grass_block);    // Load the grass block image 
         this.load.image('melody', image_melody_stand);    // Load the melody image 
+        this.load.image('shuriken', image_shuriken);    // Load Shuriken image
     }
 
     /**
@@ -42,6 +44,8 @@ export default class HeroPlatformerScene extends Phaser.Scene{
     create() {
         this.create_hero();
         this.create_grass_blocks();
+        this.melody_troop = this.physics.add.group();
+        this.shuriken_group = this.physics.add.group();
         this.create_score_text();
     }
 
@@ -66,13 +70,30 @@ export default class HeroPlatformerScene extends Phaser.Scene{
     /**
      * This method is to handle how the hero can jump.
      */
-    hero_jump() {
-        let is_standing = this.hero.body.blocked.down || this.hero.body.touching.down;
-        if (is_standing) {
-            // Hero can jump only on a platform, not in the air.
-            // jumping up at speed rate 200 initially
-            this.hero.body.velocity.y = -1 * 400;
+    hero_jump(pointer) {
+        if (this.hero.getBounds().contains(pointer.x, pointer.y)) {
+            this.shoot_weapon();
+        } else {
+            let is_standing = this.hero.body.blocked.down || this.hero.body.touching.down;
+            if (is_standing) {
+                // Hero can jump only on a platform, not in the air.
+                // jumping up at speed rate 200 initially
+                this.hero.body.velocity.y = -1 * 400;
+            }
         }
+    }
+
+    /**
+     * This method is to handle how you shoot a weapon.
+     */
+    shoot_weapon() {
+        let weapon_name = 'shuriken';    // Each sprite should have a name
+        var weapon = this.shuriken_group.create(
+            this.hero.body.x + 30
+            , this.hero.body.y + 30
+            , weapon_name
+        );
+        weapon.setVelocityX(10 * screen_velocity);
     }
 
     /**
@@ -126,16 +147,24 @@ export default class HeroPlatformerScene extends Phaser.Scene{
      create_melody(pos_x, pos_y) {
         // Set the character's start position (pos_x,pos_y) as the center of the screen
         let melody_name = 'melody';    // Each sprite should have a name
-        this.melody = this.physics.add.sprite(pos_x, pos_y, melody_name);
+        this.melody_troop.create(
+            pos_x
+            , pos_y
+            , melody_name
+        );
 
         // Set the sprite gravity effect (able to fall down)
         let melody_gravity = 400;
-        this.melody.body.gravity.y = melody_gravity;
+        this.melody_troop.children.each(
+            (child) => {
+                child.body.gravity.y = melody_gravity;
+            }
+        );
 
         // Make grass blocks and melody be bound to each other
-        this.physics.add.collider(this.grass_group, this.melody);
+        this.physics.add.collider(this.grass_group, this.melody_troop);
         
-        this.melody.setVelocityX(-1 * screen_velocity);
+        this.melody_troop.setVelocityX(-1 * screen_velocity);
     }
 
     /**
@@ -160,16 +189,50 @@ export default class HeroPlatformerScene extends Phaser.Scene{
             this.hero.setVelocityX(screen_velocity);
         }
 
+        // Remove child melody if it is out of screen (left side)
+        this.melody_troop.children.each(
+            (child) => {
+                if (child.body.x < 0) {
+                    this.melody_troop.remove(child);
+                    child.destroy();
+                }
+                // // Remove child melody if it touches Shuriken
+                var touchShuriken = false
+                this.shuriken_group.children.each(
+                    (shuriken) => {
+                        if (Phaser.Geom.Rectangle.Overlaps(shuriken.getBounds(), child.getBounds())) {
+                            touchShuriken = true;
+                        }
+                    }
+                );
+                if (touchShuriken) {
+                    this.melody_troop.remove(child);
+                    child.destroy();
+                }
+            }
+        );        
+
         // Remove child grass if it is out of screen (left side)
         this.grass_group.children.each(
             (child) => {
                 if (child.body.x < 0) {
                     this.grass_group.remove(child);
+                    child.destroy();
                     // Add scores when new grass grounds are removed.
                     this.updateScore(1);
                 }
             }
         );
+
+        // Remove child shuriken if it is out of screen (right side)
+        this.shuriken_group.children.each(
+            (child) => {
+                if (child.body.x > this.game.config.width) {
+                    this.shuriken_group.remove(child);
+                    child.destroy();
+                }
+            }
+        );  
 
         // If the right ground is moving to provide more space, fill it up
         if (this.getRightMostGrass().x < this.game.config.width - 90) {
